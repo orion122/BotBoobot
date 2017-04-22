@@ -13,7 +13,10 @@ def hello():
 @app.route('/' + config.TOKEN, methods=['POST'])
 def webhook():
     update = telegram.update.Update.de_json(request.get_json(force=True), bot)
-    bot.sendMessage(chat_id=update.message.chat_id, text='Hello, there')
+    try:
+        bot.sendMessage(chat_id=update.message.chat_id, text='Hello, there')
+    except Exception as e:
+        print(e)
 
     return 'OK'
 
