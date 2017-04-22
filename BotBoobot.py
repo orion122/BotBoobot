@@ -12,7 +12,7 @@ def hello():
 
 @app.route('/' + config.TOKEN, methods=['POST'])
 def webhook():
-    update = telegram.update.Update.de_json(request.get_json(force=True))
+    update = telegram.update.Update.de_json(request.get_json(force=True), bot)
     bot.sendMessage(chat_id=update.message.chat_id, text='Hello, there')
 
     return 'OK'
@@ -28,4 +28,4 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0',
             port=config.PORT,
             ssl_context=context,
-debug=True)
+            debug=True)
