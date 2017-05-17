@@ -20,9 +20,12 @@ def about(update):
     update.message.reply_text('Меня зовут Бубот и я могу отправлять анонимные сообщения в чаты')
 
 #========================================================DATABASE=======================================================
+def getConnection():
+	return pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+
 # Add record into table chats
 def dbAddChats(chatID, chatName, userID):
-    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    conn = getConnection()
     cur = conn.cursor()
     query = "INSERT INTO chats(chatid, chatname, added, time) VALUES(%s, %s, %s, NOW())"
     cur.execute(query, (chatID, chatName, userID))
@@ -32,7 +35,7 @@ def dbAddChats(chatID, chatName, userID):
 
 # Remove record from table chats
 def dbRemoveChats(chatID):
-    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    conn = getConnection()
     cur = conn.cursor()
     query = "DELETE FROM chats WHERE chatid=%s"
     cur.execute(query, (chatID))
@@ -42,10 +45,8 @@ def dbRemoveChats(chatID):
 
 # Search chat's id where chatname LIKE %chatName%
 def dbSearchChatID(chatName):
-    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    conn = getConnection()
     cur = conn.cursor()
-#    query = "SELECT chatid, chatName from chats WHERE chatname LIKE '%{}%'".format(chatName)
-#    cur.execute(query)
     query = "SELECT chatid, chatName from chats WHERE chatname LIKE %s"
     print(query)
     cur.execute(query, ("%" + chatName + "%"))
@@ -57,21 +58,18 @@ def dbSearchChatID(chatName):
 
 # INSERT or UPDATE record into table msg
 def dbAddMsg(userid, chatid):
-    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    conn = getConnection()
     cur = conn.cursor()
     query_check = "SELECT * FROM msg WHERE userid={}".format(userid)
     cur.execute(query_check)
     result = cur.fetchall()
     if not result:
-         #query = "INSERT INTO msg(userid, chatid) VALUES({}, {})".format(userid, chatid)
-         #cur.execute(query)
          query = "INSERT INTO msg(userid, chatid) VALUES(%s, %s)"
          cur.execute(query, (userid, chatid))
          conn.commit()
          cur.close()
          conn.close()
     else:
-         #query = "UPDATE msg SET chatid={} WHERE userid={}".format(chatid, userid)
          query = "UPDATE msg SET chatid=%s WHERE userid=%s"
          cur.execute(query, (chatid, userid))
          conn.commit()
@@ -80,9 +78,8 @@ def dbAddMsg(userid, chatid):
 
 # SEARCH recored in table msg
 def dbSearchMsg(userid):
-    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    conn = getConnection()
     cur = conn.cursor()
-    #query = "SELECT * from msg WHERE userid={}".format(userid)
     query = "SELECT * from msg WHERE userid=%s"
     cur.execute(query, (userid))
     result = cur.fetchall()
@@ -93,9 +90,8 @@ def dbSearchMsg(userid):
 
 # UPDATE time in table msg
 def dbUpdateTime(userid):
-    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    conn = getConnection()
     cur = conn.cursor()
-#    query = "UPDATE msg SET time=NOW() WHERE userid={}".format(userid)
     query = "UPDATE msg SET time=NOW() WHERE userid=%s"
     cur.execute(query, (userid))
     result = cur.fetchall()
@@ -182,8 +178,6 @@ def checkUpdateMessage(update):
     userID = update.message.from_user.id
     if len(message) > 512:
         update.message.reply_text('Сообщение слишком длинное!')
-#    elif "'" in message:
-#        update.message.reply_text('Попробуй не вводить кавычки')
     elif message == "/start" or message == "/help":
         help(update)
     elif message == "/about":
