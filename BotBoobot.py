@@ -1,25 +1,234 @@
 from flask import Flask, request
-
-import telegram, config
+import telegram, config, pymysql, datetime, logging
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 bot = telegram.Bot(config.TOKEN)
 app = Flask(__name__)
 context = (config.CERT, config.CERT_KEY)
 
-@app.route('/')
-def hello():
-    return 'Hello World!'
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG, filename = 'boobot.log')
 
+#========================================================COMMANDS=======================================================
+def help(update):
+    update.message.reply_text('/help - Помощь\n/about - Обо мне')
+    update.message.reply_text('Для того чтобы отправить анонимное сообщение в чат, в котором ты состоишь и в который ранее добавили меня, '
+                              'отправь мне такое сообщение *chat название чата*. '
+                              '(Полное название чата вводить необязательно, достаточно первых нескольких символов)',
+                               parse_mode=telegram.ParseMode.MARKDOWN)
+
+def about(update):
+    update.message.reply_text('Меня зовут Бубот и я могу отправлять анонимные сообщения в чаты')
+
+#========================================================DATABASE=======================================================
+# Add record into table chats
+def dbAddChats(chatID, chatName, userID):
+    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    cur = conn.cursor()
+    query = "INSERT INTO chats(chatid, chatname, added, time) VALUES(%s, %s, %s, NOW())"
+    cur.execute(query, (chatID, chatName, userID))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+# Remove record from table chats
+def dbRemoveChats(chatID):
+    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    cur = conn.cursor()
+    query = "DELETE FROM chats WHERE chatid=%s"
+    cur.execute(query, (chatID))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+# Search chat's id where chatname LIKE %chatName%
+def dbSearchChatID(chatName):
+    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    cur = conn.cursor()
+#    query = "SELECT chatid, chatName from chats WHERE chatname LIKE '%{}%'".format(chatName)
+#    cur.execute(query)
+    query = "SELECT chatid, chatName from chats WHERE chatname LIKE %s"
+    print(query)
+    cur.execute(query, ("%" + chatName + "%"))
+    result = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+    return result
+
+# INSERT or UPDATE record into table msg
+def dbAddMsg(userid, chatid):
+    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    cur = conn.cursor()
+    query_check = "SELECT * FROM msg WHERE userid={}".format(userid)
+    cur.execute(query_check)
+    result = cur.fetchall()
+    if not result:
+         #query = "INSERT INTO msg(userid, chatid) VALUES({}, {})".format(userid, chatid)
+         #cur.execute(query)
+         query = "INSERT INTO msg(userid, chatid) VALUES(%s, %s)"
+         cur.execute(query, (userid, chatid))
+         conn.commit()
+         cur.close()
+         conn.close()
+    else:
+         #query = "UPDATE msg SET chatid={} WHERE userid={}".format(chatid, userid)
+         query = "UPDATE msg SET chatid=%s WHERE userid=%s"
+         cur.execute(query, (chatid, userid))
+         conn.commit()
+         cur.close()
+         conn.close()
+
+# SEARCH recored in table msg
+def dbSearchMsg(userid):
+    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    cur = conn.cursor()
+    #query = "SELECT * from msg WHERE userid={}".format(userid)
+    query = "SELECT * from msg WHERE userid=%s"
+    cur.execute(query, (userid))
+    result = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+    return result
+
+# UPDATE time in table msg
+def dbUpdateTime(userid):
+    conn = pymysql.connect(host='localhost', port=3306, user='boobot', passwd=config.DBPSWD, db='boobot', charset='utf8mb4')
+    cur = conn.cursor()
+#    query = "UPDATE msg SET time=NOW() WHERE userid={}".format(userid)
+    query = "UPDATE msg SET time=NOW() WHERE userid=%s"
+    cur.execute(query, (userid))
+    result = cur.fetchall()
+    conn.commit()
+    cur.close()
+    conn.close()
+    return result
+
+#=======================================================================================================================
+# Chats where user is member
+def whereMember(chats, userid):
+    here_member = []
+    for chat in chats:
+       if (bot.get_chat_member(chat[0], userid).status) != 'left':
+           here_member.append(chat)
+    return here_member
+
+# Select chat among chats
+def selectChat(chats, userid):
+    keyboard= []
+    for chat in chats:
+        tmp = [InlineKeyboardButton(chat[1], callback_data='choosenCHAT{}'.format(str(chat[0])))]
+        keyboard.append(tmp)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    bot.sendMessage(chat_id=userid, text='Нашел несколько чатов с похожим названием. Выбери нужный', reply_markup=reply_markup)
+
+
+def compareTimes(last_msg_time):
+    dt = (datetime.datetime.now() - datetime.datetime.strptime(str(last_msg_time), '%Y-%m-%d %H:%M:%S')).total_seconds() / 60
+    return dt
+
+
+def checkSelectedChat(update, userID, chatID=0):
+    if chatID != 0:
+        dbAddMsg(userID, chatID)
+        bot.sendMessage(chat_id=userID, text='OK! Теперь чтобы отправить анонимное сообщение в выбранный ранее чат, '
+                                             'отправь мне такое сообщение *msg текст анонимного сообщения*', 
+                        parse_mode=telegram.ParseMode.MARKDOWN)
+        return
+
+    chatName = update.message.text[5:]
+    found_chats = dbSearchChatID(chatName)
+    chats_where_is_member = whereMember(found_chats, userID)
+
+    if (len(chats_where_is_member) > 1):
+        selectChat(found_chats, userID)
+    elif (len(chats_where_is_member) == 1):
+        bot.sendMessage(chat_id=userID, text='Сообщение будет отправлено в чат: *{}*\n'
+                                             'Теперь отправь мне такое сообщение: *msg текст анонимного сообщения*'.format(chats_where_is_member[0][1]), 
+                        parse_mode=telegram.ParseMode.MARKDOWN)
+        chatid_anon_msg = chats_where_is_member[0][0]
+        dbAddMsg(userID, chatid_anon_msg)
+    else:
+        bot.sendMessage(chat_id=userID, text='Чат с таким названием не найден. '
+                                             'Причин может быть несколько:\n1)Меня не добавили в этот чат\n2)Ты не состоишь в этом чате\n3)Ты немного ошибся в названии чата')
+
+def checkAnonMsg(update, userID):
+    msg = update.message.text[4:]
+    result_msg = dbSearchMsg(userID)
+    if result_msg:
+        if result_msg[0][2] == None:
+            bot.sendMessage(chat_id=int(result_msg[0][1]), text=msg)
+            dbUpdateTime(userID)
+        else:
+            compare_times = compareTimes(result_msg[0][2])
+            if compare_times >= config.ALLOWED_TIME:
+                bot.sendMessage(chat_id=int(result_msg[0][1]), text=msg)
+                dbUpdateTime(userID)
+            else:
+                allowed_dt = config.ALLOWED_TIME - compare_times
+                bot.sendMessage(chat_id=userID,
+                                text='Сообщение не будет отправлено из-за ограничений. '
+                                     'Отправьте сообщение заново через *{}* секунд'.format(str(allowed_dt*60)[:str(allowed_dt*60).find('.')]), 
+                                parse_mode=telegram.ParseMode.MARKDOWN)
+    else:
+        bot.sendMessage(chat_id=userID,
+                        text="Для началы выбери чат. Чтобы выбрать чат отправь мне такое сообщение: *chat название чата*'. "
+                             "(Полное название чата вводить необязательно, достаточно первых нескольких символов", 
+                        parse_mode=telegram.ParseMode.MARKDOWN)
+
+
+def checkUpdateMessage(update):
+    message = update.message.text
+    userID = update.message.from_user.id
+    if len(message) > 512:
+        update.message.reply_text('Сообщение слишком длинное!')
+#    elif "'" in message:
+#        update.message.reply_text('Попробуй не вводить кавычки')
+    elif message == "/start" or message == "/help":
+        help(update)
+    elif message == "/about":
+        about(update)
+    elif (len(message) > 5) and (message.lower().startswith('chat ')):
+        checkSelectedChat(update, userID)
+    elif (len(message) > 4) and (message.lower().startswith('msg ')):
+        checkAnonMsg(update, userID)
+    else:
+        pass
+
+def initAddToChat(update):
+    chatID = update.message.chat.id
+    chatName = update.message.chat.title
+    userID = update.message.from_user.id
+    dbAddChats(chatID, chatName, userID)
+
+def initRemoveFromChat(update):
+    chatID = update.message.chat.id
+    dbRemoveChats(chatID)
+
+def checkUpdate(update):
+    if update.channel_post:
+        print(update.channel_post)
+    elif hasattr(update.message, 'text') and (len(update.message.text) > 0):
+        checkUpdateMessage(update)
+    elif hasattr(update.message, 'new_chat_member') and (update.message.new_chat_member != None) and (
+        update.message.new_chat_member.username == 'BotBoobot'):
+        initAddToChat(update)
+        bot.sendMessage(chat_id=update.message.chat.id,
+                        text='Привет всем! Меня зовут Бубот. Я могу отправлять анонимные сообщения в этот чат. '
+                             'Для начала напиши мне в личку. Я расскажу как мной пользоваться ;)')
+    elif hasattr(update.message, 'left_chat_member') and (update.message.left_chat_member != None) and (
+        update.message.left_chat_member.username == 'BotBoobot'):
+        initRemoveFromChat(update)
+    elif hasattr(update.callback_query, 'data'):
+        checkSelectedChat(update, update.callback_query.from_user.id, update.callback_query.data[11:])
+
+#=======================================================================================================================
 @app.route('/' + config.TOKEN, methods=['POST'])
 def webhook():
     update = telegram.update.Update.de_json(request.get_json(force=True), bot)
-    try:
-        bot.sendMessage(chat_id=update.message.chat_id, text='Hello, there')
-    except Exception as e:
-        print(e)
-
+    print(update)
+    checkUpdate(update)
     return 'OK'
-
 
 def setWebhook():
     bot.setWebhook(webhook_url='https://%s:%s/%s' % (config.HOST, config.PORT, config.TOKEN),
@@ -27,7 +236,6 @@ def setWebhook():
 
 if __name__ == '__main__':
     setWebhook()
-
     app.run(host='0.0.0.0',
             port=config.PORT,
             ssl_context=context,
