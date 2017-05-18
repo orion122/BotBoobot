@@ -6,7 +6,7 @@ bot = telegram.Bot(config.TOKEN)
 app = Flask(__name__)
 context = (config.CERT, config.CERT_KEY)
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG, filename = 'boobot.log')
+#logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG, filename = 'boobot.log')
 
 #========================================================COMMANDS=======================================================
 def help(update):
@@ -193,6 +193,8 @@ def checkUpdateMessage(update):
     userID = update.message.from_user.id
     if len(message) > 512:
         update.message.reply_text('Сообщение слишком длинное!')
+    elif "%" in message:
+        update.message.reply_text('Давай без %')
     elif message == "/start" or message == "/help":
         help(update)
     elif message == "/about":
@@ -235,7 +237,7 @@ def checkUpdate(update):
 @app.route('/' + config.TOKEN, methods=['POST'])
 def webhook():
     update = telegram.update.Update.de_json(request.get_json(force=True), bot)
-    print(update)
+    #print(update)
     checkUpdate(update)
     return 'OK'
 
