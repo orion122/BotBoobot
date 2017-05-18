@@ -48,7 +48,6 @@ def dbSearchChatID(chatName):
     conn = getConnection()
     cur = conn.cursor()
     query = "SELECT chatid, chatName from chats WHERE chatname LIKE %s"
-    print(query)
     cur.execute(query, ("%" + chatName + "%"))
     result = cur.fetchall()
     conn.commit()
@@ -100,6 +99,18 @@ def dbUpdateTime(userid):
     conn.close()
     return result
 
+# If select chat by InlineKeyboardButton, but bot was deletedcfrom this chat
+def dbCheckBotIsMember(chatid):
+    conn = getConnection()
+    cur = conn.cursor()
+    query = "SELECT * FROM chats WHERE chatid=%s"
+    cur.execute(query, (chatid))
+    result = cur.fetchall()
+    cur.close()
+    conn.close()
+    if result:
+        return True
+    return False
 #=======================================================================================================================
 # Chats where user is member
 def whereMember(chats, userid):
@@ -125,12 +136,16 @@ def compareTimes(last_msg_time):
 
 
 def checkSelectedChat(update, userID, chatID=0):
-    if chatID != 0:
-        dbAddMsg(userID, chatID)
-        bot.sendMessage(chat_id=userID, text='OK! Теперь чтобы отправить анонимное сообщение в выбранный ранее чат, '
-                                             'отправь мне такое сообщение *msg текст анонимного сообщения*', 
-                        parse_mode=telegram.ParseMode.MARKDOWN)
-        return
+    if (chatID != 0):
+        if dbCheckBotIsMember(chatID):
+            dbAddMsg(userID, chatID)
+            bot.sendMessage(chat_id=userID, text='OK! Теперь чтобы отправить анонимное сообщение в выбранный ранее чат, '
+                                                 'отправь мне такое сообщение *msg текст анонимного сообщения*', 
+                            parse_mode=telegram.ParseMode.MARKDOWN)
+            return
+        else:
+            bot.sendMessage(chat_id=userID, text='Меня удалили из этого чата')
+            return
 
     chatName = update.message.text[5:]
     found_chats = dbSearchChatID(chatName)
