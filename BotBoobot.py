@@ -1,23 +1,30 @@
 from flask import Flask, request
-import telegram, config, pymysql, datetime, logging
+import telegram, config, pymysql, datetime, logging, sys
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 bot = telegram.Bot(config.TOKEN)
 app = Flask(__name__)
 context = (config.CERT, config.CERT_KEY)
 
-#logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG, filename = 'boobot.log')
-
 #========================================================COMMANDS=======================================================
-def help(update):
-    update.message.reply_text('/help - Помощь\n/about - Обо мне')
-    update.message.reply_text('Для того чтобы отправить анонимное сообщение в чат, в котором ты состоишь и в который ранее добавили меня, '
-                              'отправь мне такое сообщение *chat название чата*. '
-                              '(Полное название чата вводить необязательно, достаточно первых нескольких символов)',
-                               parse_mode=telegram.ParseMode.MARKDOWN)
+def help(update, inChat=False):
+    if inChat == False:
+        update.message.reply_text('/help - Помощь\n/about - Обо мне')
+        update.message.reply_text('Для того чтобы отправить анонимное сообщение в чат, в котором ты состоишь и в который ранее добавили меня, '
+                                  'отправь мне такое сообщение *chat название чата*. '
+                                  '(Полное название чата вводить необязательно, достаточно первых нескольких символов)',
+                                   parse_mode=telegram.ParseMode.MARKDOWN)
+    else:
+        update.message.reply_text('Для того чтобы отправить анонимное сообщение в чат, в котором ты состоишь и в который ранее добавили меня, '
+                                  'отправь мне личку такое сообщение *chat название чата*. '
+                                  '(Полное название чата вводить необязательно, достаточно первых нескольких символов)',
+                                   parse_mode=telegram.ParseMode.MARKDOWN)
 
-def about(update):
-    update.message.reply_text('Меня зовут Бубот и я могу отправлять анонимные сообщения в чаты')
+def about(update, inChat=False):
+    if inChat == False:
+        update.message.reply_text('Меня зовут Бубот и я могу отправлять анонимные сообщения в чаты')
+    else:
+        update.message.reply_text('Меня зовут Бубот и я могу отправлять анонимные сообщения в этот и некоторые другие чаты. Подробности в личке ;)')
 
 #========================================================DATABASE=======================================================
 def getConnection():
@@ -195,10 +202,14 @@ def checkUpdateMessage(update):
         update.message.reply_text('Сообщение слишком длинное!')
     elif "%" in message:
         update.message.reply_text('Давай без %')
-    elif message == "/start" or message == "/help":
+    elif message in ["/start", "/help"]:
         help(update)
-    elif message == "/about":
+    elif message in ["/help@BotBoobot"]:
+        help(update, inChat=True)
+    elif message in ["/about"]:
         about(update)
+    elif message in ["/about@BotBoobot"]:
+        about(update, inChat=True)
     elif (len(message) > 5) and (message.lower().startswith('chat ')):
         checkSelectedChat(update, userID)
     elif (len(message) > 4) and (message.lower().startswith('msg ')):
@@ -237,7 +248,8 @@ def checkUpdate(update):
 @app.route('/' + config.TOKEN, methods=['POST'])
 def webhook():
     update = telegram.update.Update.de_json(request.get_json(force=True), bot)
-    #print(update)
+    print(update)
+    sys.stdout.flush()
     checkUpdate(update)
     return 'OK'
 
