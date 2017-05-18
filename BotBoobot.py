@@ -152,7 +152,7 @@ def checkSelectedChat(update, userID, chatID=0):
     chats_where_is_member = whereMember(found_chats, userID)
 
     if (len(chats_where_is_member) > 1):
-        selectChat(found_chats, userID)
+        selectChat(chats_where_is_member, userID)
     elif (len(chats_where_is_member) == 1):
         bot.sendMessage(chat_id=userID, text='Сообщение будет отправлено в чат: *{}*\n'
                                              'Теперь отправь мне такое сообщение: *msg текст анонимного сообщения*'.format(chats_where_is_member[0][1]), 
