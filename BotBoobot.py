@@ -1,5 +1,5 @@
 from flask import Flask, request
-import telegram, config, pymysql, datetime, logging, sys
+import telegram, config, pymysql, datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 bot = telegram.Bot(config.TOKEN)
@@ -248,8 +248,6 @@ def checkUpdate(update):
 @app.route('/' + config.TOKEN, methods=['POST'])
 def webhook():
     update = telegram.update.Update.de_json(request.get_json(force=True), bot)
-    print(update)
-    sys.stdout.flush()
     checkUpdate(update)
     return 'OK'
 
