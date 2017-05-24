@@ -1,5 +1,5 @@
 from flask import Flask, request
-import telegram, config, pymysql, datetime
+import telegram, config, pymysql, datetime, logging, sys
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 bot = telegram.Bot(config.TOKEN)
@@ -10,21 +10,21 @@ context = (config.CERT, config.CERT_KEY)
 def help(update, inChat=False):
     if inChat == False:
         update.message.reply_text('/help - Помощь\n/about - Обо мне')
-        update.message.reply_text('Для того чтобы отправить анонимное сообщение в чат, в котором ты состоишь и в который ранее добавили меня, '
+        update.message.reply_text('Для того чтобы выбрать чат, в который ты хочешь отправить анонимное сообщение (только текстовое сообщение), '
                                   'отправь мне такое сообщение *chat название чата*. '
                                   '(Полное название чата вводить необязательно, достаточно первых нескольких символов)',
                                    parse_mode=telegram.ParseMode.MARKDOWN)
     else:
-        update.message.reply_text('Для того чтобы отправить анонимное сообщение в чат, в котором ты состоишь и в который ранее добавили меня, '
+        update.message.reply_text('Для того чтобы выбрать чат, в который ты хочешь отправить анонимное сообщение (только текстовое сообщение), '
                                   'отправь мне личку такое сообщение *chat название чата*. '
                                   '(Полное название чата вводить необязательно, достаточно первых нескольких символов)',
                                    parse_mode=telegram.ParseMode.MARKDOWN)
 
 def about(update, inChat=False):
     if inChat == False:
-        update.message.reply_text('Меня зовут Бубот и я могу отправлять анонимные сообщения в чаты')
+        update.message.reply_text('Я могу отправлять анонимные сообщения в чаты (только текстовые сообщения)')
     else:
-        update.message.reply_text('Меня зовут Бубот и я могу отправлять анонимные сообщения в этот и некоторые другие чаты. Подробности в личке ;)')
+        update.message.reply_text('Я могу отправлять анонимные сообщения в этот и некоторые другие чаты (только текстовые сообщения). Подробности в личке ;)')
 
 #========================================================DATABASE=======================================================
 def getConnection():
@@ -168,7 +168,7 @@ def checkSelectedChat(update, userID, chatID=0):
         dbAddMsg(userID, chatid_anon_msg)
     else:
         bot.sendMessage(chat_id=userID, text='Чат с таким названием не найден. '
-                                             'Причин может быть несколько:\n1)Меня не добавили в этот чат\n2)Ты не состоишь в этом чате\n3)Ты немного ошибся в названии чата')
+                                             'Причин может быть несколько:\n1)Меня не добавили в этот чат\n2)Ты не состоишь в этом чате\n3)Ты немного ошибся в названии чата\n4)Название чата изменилось (в этом случае бота нужно удалить из чата и добавить заново)')
 
 def checkAnonMsg(update, userID):
     msg = update.message.text[4:]
@@ -190,7 +190,7 @@ def checkAnonMsg(update, userID):
                                 parse_mode=telegram.ParseMode.MARKDOWN)
     else:
         bot.sendMessage(chat_id=userID,
-                        text="Для началы выбери чат. Чтобы выбрать чат отправь мне такое сообщение: *chat название чата*'. "
+                        text="Для начала выбери чат. Чтобы выбрать чат отправь мне такое сообщение: *chat название чата*'. "
                              "(Полное название чата вводить необязательно, достаточно первых нескольких символов", 
                         parse_mode=telegram.ParseMode.MARKDOWN)
 
@@ -236,7 +236,7 @@ def checkUpdate(update):
         update.message.new_chat_member.username == 'BotBoobot'):
         initAddToChat(update)
         bot.sendMessage(chat_id=update.message.chat.id,
-                        text='Привет всем! Меня зовут Бубот. Я могу отправлять анонимные сообщения в этот чат. '
+                        text='Привет всем! Я могу отправлять анонимные сообщения в этот чат и некоторые другие. '
                              'Для начала напиши мне в личку. Я расскажу как мной пользоваться ;)')
     elif hasattr(update.message, 'left_chat_member') and (update.message.left_chat_member != None) and (
         update.message.left_chat_member.username == 'BotBoobot'):
@@ -248,6 +248,8 @@ def checkUpdate(update):
 @app.route('/' + config.TOKEN, methods=['POST'])
 def webhook():
     update = telegram.update.Update.de_json(request.get_json(force=True), bot)
+    print(update)
+    sys.stdout.flush()
     checkUpdate(update)
     return 'OK'
 
