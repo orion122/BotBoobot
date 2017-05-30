@@ -168,7 +168,7 @@ def checkSelectedChat(update, userID, chatID=0):
         dbAddMsg(userID, chatid_anon_msg)
     else:
         bot.sendMessage(chat_id=userID, text='Чат с таким названием не найден. '
-                                             'Причин может быть несколько:\n1)Меня не добавили в этот чат\n2)Ты не состоишь в этом чате\n3)Ты немного ошибся в названии чата\n4)Название чата изменилось (в этом случае бота нужно удалить из чата и добавить заново)')
+                                             'Причин может быть несколько:\n1) Меня не добавили в этот чат\n2) Ты не состоишь в этом чате\n3) Ты немного ошибся в названии чата\n4) Название чата изменилось (в этом случае меня нужно удалить из чата и добавить заново)\n\nДобавь меня в чат, в который хочешь отправлять анонимные сообщения или попроси админа чата, чтобы добавил меня.')
 
 def checkAnonMsg(update, userID):
     msg = update.message.text[4:]
@@ -215,7 +215,7 @@ def checkUpdateMessage(update):
     elif (len(message) > 4) and (message.lower().startswith('msg ')):
         checkAnonMsg(update, userID)
     else:
-        pass
+        update.message.reply_text('Неизвестная команда. Перечитай пожалуйста внимательно инструкцию. Нажми на /help')
 
 def initAddToChat(update):
     chatID = update.message.chat.id
